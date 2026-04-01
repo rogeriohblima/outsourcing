@@ -1,0 +1,69 @@
+###############################################################################
+# docker-compose.dev.yml — Overrides para ambiente de desenvolvimento.
+#
+# Sobrescreve o docker-compose.yml com configurações de dev:
+#   - Backend com hot-reload (--reload)
+#   - Volume mount do código-fonte para edição em tempo real
+#   - Variáveis de ambiente de desenvolvimento
+#   - pgAdmin para gerenciamento visual do banco
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+###############################################################################
+
+services:
+
+  # ── Backend com hot-reload ──────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app          # Mount do código para hot-reload
+      - uploads_data:/app/uploads
+    environment:
+      DATABASE_URL:      sqlite+aiosqlite:///./contrato_impressoras_dev.db
+      SYNC_DATABASE_URL: sqlite:///./contrato_impressoras_dev.db
+      APP_ENV:           development
+      DEBUG:             "true"
+      SECRET_KEY:        chave-insegura-apenas-para-desenvolvimento-local
+      AD_SERVER:         127.0.0.1   # AD não disponível → usa credenciais de dev
+      CORS_ORIGINS:      '["http://localhost:5173","http://localhost:3000","http://localhost"]'
+    depends_on: []   # Remove dependência do postgres em dev (usa SQLite)
+
+  # ── Frontend com Vite dev server ────────────────────────────────────────────
+  frontend:
+    build: ~   # Não faz build Docker — usa npm run dev diretamente
+    image: node:20-alpine
+    command: sh -c "cd /app && npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules    # Preserva node_modules dentro do container
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+  # ── pgAdmin (opcional) ───────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: sci_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@sci.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT:      5050
+    ports:
+      - "5050:5050"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    profiles:
+      - pgadmin   # Ativado apenas com: docker compose --profile pgadmin up
+
+volumes:
+  pgadmin_data:
