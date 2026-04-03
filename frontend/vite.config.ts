@@ -2,7 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// https://vitejs.dev/config/
+// vite.config.ts
+// Quando VITE_API_URL for vazio (build Docker), o cliente HTTP usa
+// caminhos relativos (/api/v1/...) — o Nginx faz o proxy para o backend.
+// Em desenvolvimento local (npm run dev), usa http://localhost:8000.
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,7 +17,6 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy para evitar CORS em desenvolvimento
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,

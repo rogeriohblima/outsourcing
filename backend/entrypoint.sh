@@ -1,44 +1,43 @@
 #!/bin/sh
-# entrypoint.sh — Executa migrations do Alembic e inicia o servidor Uvicorn.
-#
-# Fluxo:
-#   1. Aguarda o banco de dados ficar pronto (retry com backoff)
-#   2. Aplica todas as migrations pendentes (alembic upgrade head)
-#   3. Inicia o servidor Uvicorn
-#
-# Em caso de falha nas migrations, o container é encerrado com erro
-# para que o orquestrador (Docker Compose / Kubernetes) possa reiniciar.
-
+# entrypoint.sh — Aguarda PostgreSQL, aplica migrations e inicia o servidor.
 set -e
 
-echo "[entrypoint] Aguardando banco de dados…"
+echo "[entrypoint] Iniciando SCI Backend..."
+echo "[entrypoint] APP_ENV=${APP_ENV}"
 
-# Aguarda até 60s para o banco aceitar conexões
-MAX_TRIES=30
-WAIT=2
-i=0
-until python -c "
-import sys, os
-try:
-    import psycopg2
-    psycopg2.connect(os.environ.get('SYNC_DATABASE_URL',''))
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null; do
-    i=$((i + 1))
-    if [ $i -ge $MAX_TRIES ]; then
-        echo "[entrypoint] ERRO: banco de dados não respondeu após ${MAX_TRIES} tentativas." >&2
-        exit 1
-    fi
-    echo "[entrypoint] Tentativa $i/$MAX_TRIES — aguardando ${WAIT}s…"
-    sleep $WAIT
-done
+# Extrai host e porta da DATABASE_URL para usar no pg_isready
+# Exemplo: postgresql+asyncpg://sci_user:senha@postgres:5432/contrato_impressoras
+#          => host=postgres porta=5432
+DB_HOST=$(echo "$DATABASE_URL" | sed 's|.*@||' | sed 's|:.*||' | sed 's|/.*||')
+DB_PORT=$(echo "$DATABASE_URL" | sed 's|.*:||' | sed 's|/.*||')
+DB_USER=$(echo "$DATABASE_URL" | sed 's|.*://||' | sed 's|:.*||')
 
-echo "[entrypoint] Banco disponível. Executando migrations…"
+# Se nao for PostgreSQL (ex: SQLite), pula a espera
+if echo "$DATABASE_URL" | grep -q "postgresql"; then
+    echo "[entrypoint] Aguardando PostgreSQL em ${DB_HOST}:${DB_PORT}..."
+    MAX_TRIES=30
+    i=0
+    until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -q; do
+        i=$((i + 1))
+        if [ $i -ge $MAX_TRIES ]; then
+            echo "[entrypoint] ERRO: PostgreSQL nao respondeu apos ${MAX_TRIES} tentativas."
+            exit 1
+        fi
+        echo "[entrypoint] Tentativa $i/$MAX_TRIES — aguardando 2s..."
+        sleep 2
+    done
+    echo "[entrypoint] PostgreSQL disponivel!"
+else
+    echo "[entrypoint] SQLite detectado — sem espera necessaria."
+fi
+
+# Aplica migrations
+echo "[entrypoint] Aplicando migrations..."
 alembic upgrade head
+echo "[entrypoint] Migrations aplicadas!"
 
-echo "[entrypoint] Migrations concluídas. Iniciando servidor…"
+# Inicia o servidor
+echo "[entrypoint] Iniciando Uvicorn na porta 8000..."
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \

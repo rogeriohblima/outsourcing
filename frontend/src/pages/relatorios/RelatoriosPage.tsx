@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/relatorios/RelatoriosPage.tsx — Relatórios mensais, totais e gráficos.
  *
  * Seções:
@@ -226,6 +226,7 @@ export default function RelatoriosPage() {
                 <div className="card space-y-3">
                   <h3 className="font-semibold text-gray-700">Resumo Financeiro</h3>
                   <div className="space-y-2">
+                    <div className="flex justify-between text-sm"><span className="text-gray-500">Valor estimado:</span> <span className="font-semibold">{formatCurrency(relTotal.valor_estimado)}</span></div>
                     <div className="flex justify-between text-sm"><span className="text-gray-500">Total empenhado:</span> <span className="font-semibold">{formatCurrency(relTotal.total_empenhado)}</span></div>
                     <div className="flex justify-between text-sm"><span className="text-gray-500">Total consumido:</span> <span className="font-semibold text-fab-700">{formatCurrency(relTotal.total_geral_valor)}</span></div>
                     <div className="flex justify-between text-sm"><span className="text-gray-500">Saldo disponível:</span> <span className={`font-semibold ${relTotal.total_empenhado - relTotal.total_geral_valor < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(relTotal.total_empenhado - relTotal.total_geral_valor)}</span></div>

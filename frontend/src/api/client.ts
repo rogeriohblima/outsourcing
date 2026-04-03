@@ -1,19 +1,17 @@
 /**
  * api/client.ts — Cliente HTTP centralizado (Axios).
  *
- * Responsabilidades:
- *  - Define a baseURL a partir da variável de ambiente VITE_API_URL
- *  - Interceptor de request: injeta o Bearer token JWT em toda requisição
- *  - Interceptor de response: trata 401 (redireciona para login) e
- *    normaliza mensagens de erro da API
+ * Em Docker: VITE_API_URL e vazio — usa /api/v1 (relativo).
+ *   O Nginx faz proxy de /api/* para http://backend:8000.
  *
- * Uso:
- *   import api from '@/api/client'
- *   const data = await api.get('/membros/')
+ * Em desenvolvimento local: VITE_API_URL=http://localhost:8000
+ *   O Vite dev server faz proxy de /api/* para o backend.
  */
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
+// Se VITE_API_URL estiver definido, usa ele. Caso contrario, usa caminho
+// relativo (funciona tanto com Nginx proxy quanto com Vite dev proxy).
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/v1`
   : '/api/v1'
@@ -21,11 +19,10 @@ const BASE_URL = import.meta.env.VITE_API_URL
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000, // 30 segundos (SNMP pode demorar)
+  timeout: 30_000,
 })
 
-// ── Interceptor de Request: injeta JWT ───────────────────────────────────────
-
+// Injeta JWT em todas as requisicoes
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('access_token')
@@ -37,13 +34,11 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// ── Interceptor de Response: trata erros globais ─────────────────────────────
-
+// Trata 401 globalmente
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token expirado ou inválido — limpa storage e redireciona para login
       localStorage.removeItem('access_token')
       localStorage.removeItem('user_info')
       window.location.href = '/login'
@@ -54,12 +49,6 @@ api.interceptors.response.use(
 
 export default api
 
-// ── Helpers de extração de mensagem de erro ───────────────────────────────────
-
-/**
- * Extrai uma mensagem de erro legível de uma resposta da API.
- * A API pode retornar string simples ou array de erros Pydantic.
- */
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const detail = error.response?.data?.detail

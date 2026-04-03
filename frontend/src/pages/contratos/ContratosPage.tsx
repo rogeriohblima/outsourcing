@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/contratos/ContratosPage.tsx — CRUD de Contratos.
  */
 import { useState } from 'react'
@@ -22,6 +22,7 @@ const schema = z.object({
   data_termino:   z.string().min(1),
   comissao_id:    z.coerce.number().min(1),
   numero_processo: z.string().min(1),
+  valor_estimado: z.coerce.number().min(0, "Valor deve ser maior ou igual a zero"),
 })
 type FormData = z.infer<typeof schema>
 
@@ -44,6 +45,9 @@ function ContratoForm({ defaultValues, onSubmit, isLoading, editMode }: {
           <input {...register('numero_processo')} className="input" placeholder="NUP-2025-000001" />
         </FormField>
       </div>
+      <FormField label="Valor Estimado (R$)" error={errors.valor_estimado?.message} required>
+        <input {...register('valor_estimado')} type="number" step="0.01" min={0} className="input" placeholder="100000.00" />
+      </FormField>
       <FormField label="Empresa" error={errors.empresa_cnpj?.message} required>
         <select {...register('empresa_cnpj')} className="input">
           <option value="">Selecione…</option>
@@ -103,7 +107,7 @@ export default function ContratosPage() {
       {apiError && <div className="mb-4"><AlertMessage type="error" message={apiError} onClose={() => setApiError(null)} /></div>}
       <div className="table-wrapper">
         <table className="table">
-          <thead><tr><th>Número</th><th>Empresa</th><th>Início</th><th>Término</th><th>Processo</th><th>Status</th><th className="text-right">Ações</th></tr></thead>
+          <thead><tr><th>Número</th><th>Empresa</th><th>Início</th><th>Término</th><th>Valor Estimado</th><th>Status</th><th className="text-right">Ações</th></tr></thead>
           <tbody className="divide-y divide-gray-100">
             {(contratos ?? []).length === 0
               ? <tr><td colSpan={7}><EmptyState /></td></tr>
@@ -115,7 +119,7 @@ export default function ContratosPage() {
                     <td className="text-sm">{c.empresa.nome}</td>
                     <td className="text-xs">{formatDate(c.data_inicio)}</td>
                     <td className="text-xs">{formatDate(c.data_termino)}</td>
-                    <td className="text-xs text-gray-500">{c.numero_processo}</td>
+                    <td className="text-sm font-medium text-emerald-700">{formatCurrency(c.valor_estimado)}</td>
                     <td>{vigente ? <span className="badge-green">Vigente</span> : new Date(c.data_termino) < hoje ? <span className="badge-red">Encerrado</span> : <span className="badge-yellow">A iniciar</span>}</td>
                     <td className="text-right">
                       <div className="flex justify-end gap-1">

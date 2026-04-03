@@ -1,19 +1,15 @@
 ###############################################################################
-# docker-compose.yml — Orquestração completa do sistema SCI
+# docker-compose.yml — Stack completo do SCI para uso no trabalho
 #
-# Serviços:
+# Servicos:
 #   postgres  : banco de dados PostgreSQL 16
-#   backend   : API FastAPI (Uvicorn)
-#   frontend  : SPA React servida pelo Nginx
+#   backend   : API FastAPI (porta 8000)
+#   frontend  : React + Nginx (porta 80)
 #
-# Uso em desenvolvimento:
-#   docker compose up --build
-#
-# Uso em produção:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-#
-# Variáveis de ambiente: defina no arquivo .env na raiz do projeto.
-# Copie de .env.example e ajuste antes de executar.
+# Uso rapido:
+#   1. Copie .env.docker para .env  (ajuste as variaveis)
+#   2. docker compose up --build -d
+#   3. Acesse http://localhost
 ###############################################################################
 
 services:
@@ -29,15 +25,19 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sci_senha_segura}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"      # Expõe localmente para ferramentas como DBeaver
+    networks:
+      - sci_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sci_user} -d ${POSTGRES_DB:-contrato_impressoras}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # NAO exponha a porta 5432 em producao — acesso apenas interno
+    # Descomente abaixo se precisar de acesso externo (ex: DBeaver):
+    # ports:
+    #   - "5432:5432"
 
-  # ── Backend (FastAPI) ───────────────────────────────────────────────────────
+  # ── Backend (FastAPI + Uvicorn) ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -48,33 +48,47 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Banco de dados
       DATABASE_URL:      postgresql+asyncpg://${POSTGRES_USER:-sci_user}:${POSTGRES_PASSWORD:-sci_senha_segura}@postgres:5432/${POSTGRES_DB:-contrato_impressoras}
       SYNC_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-sci_user}:${POSTGRES_PASSWORD:-sci_senha_segura}@postgres:5432/${POSTGRES_DB:-contrato_impressoras}
-      SECRET_KEY:        ${SECRET_KEY:-TROQUE_EM_PRODUCAO}
-      APP_ENV:           ${APP_ENV:-production}
-      DEBUG:             ${DEBUG:-false}
+      # Seguranca
+      SECRET_KEY:        ${SECRET_KEY:-TROQUE_POR_CHAVE_SEGURA_EM_PRODUCAO}
+      # Ambiente
+      APP_ENV:           ${APP_ENV:-development}
+      DEBUG:             ${DEBUG:-true}
+      # Active Directory
       AD_SERVER:         ${AD_SERVER:-10.10.10.10}
       AD_PORT:           ${AD_PORT:-389}
+      AD_USE_SSL:        ${AD_USE_SSL:-false}
       AD_DOMAIN:         ${AD_DOMAIN:-organizacao.mil.br}
       AD_BASE_DN:        ${AD_BASE_DN:-DC=organizacao,DC=mil,DC=br}
       AD_BIND_USER:      ${AD_BIND_USER:-}
       AD_BIND_PASSWORD:  ${AD_BIND_PASSWORD:-}
+      # SNMP
       SNMP_COMMUNITY:    ${SNMP_COMMUNITY:-public}
-      CORS_ORIGINS:      '["http://localhost", "http://localhost:80"]'
+      SNMP_PORT:         ${SNMP_PORT:-161}
+      SNMP_TIMEOUT:      ${SNMP_TIMEOUT:-5}
+      # CORS — permite acesso do frontend (Nginx na porta 80)
+      CORS_ORIGINS:      '["http://localhost","http://localhost:80","http://127.0.0.1"]'
+      UPLOAD_DIR:        /app/uploads
     volumes:
       - uploads_data:/app/uploads
-    ports:
-      - "8000:8000"
     networks:
       - sci_network
+    # Backend nao precisa expor porta para fora — o Nginx faz proxy
+    # Descomente se quiser acessar http://localhost:8000/docs diretamente:
+    ports:
+      - "8000:8000"
 
-  # ── Frontend (React + Nginx) ────────────────────────────────────────────────
+  # ── Frontend (React buildado + Nginx) ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://backend:8000
+        # Durante o build do React, a API e acessada via proxy do Nginx
+        # Por isso usamos /api (caminho relativo), nao http://backend:8000
+        VITE_API_URL: ""
     container_name: sci_frontend
     restart: unless-stopped
     depends_on:
@@ -84,12 +98,12 @@ services:
     networks:
       - sci_network
 
-# ── Volumes ──────────────────────────────────────────────────────────────────
+# ── Volumes persistentes ──────────────────────────────────────────────────────
 volumes:
-  postgres_data:
-  uploads_data:
+  postgres_data:    # Dados do PostgreSQL — persiste entre restarts
+  uploads_data:     # Documentos PDF da comissao — persiste entre restarts
 
-# ── Redes ────────────────────────────────────────────────────────────────────
+# ── Rede interna ──────────────────────────────────────────────────────────────
 networks:
   sci_network:
     driver: bridge

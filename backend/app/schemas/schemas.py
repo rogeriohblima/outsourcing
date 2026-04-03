@@ -111,6 +111,7 @@ class ContratoBase(BaseModel):
     data_termino: date
     comissao_id: int
     numero_processo: str = Field(..., max_length=100, description="Número do processo administrativo")
+    valor_estimado: Decimal = Field(..., ge=0, decimal_places=2, description="Valor estimado total do contrato (R$)")
 
     @field_validator("data_termino")
     @classmethod
@@ -131,6 +132,7 @@ class ContratoUpdate(BaseModel):
     data_termino: Optional[date] = None
     comissao_id: Optional[int] = None
     numero_processo: Optional[str] = None
+    valor_estimado: Optional[Decimal] = None
 
 
 class ContratoOut(ContratoBase):
@@ -446,6 +448,7 @@ class RelatorioTotal(BaseModel):
     data_inicio: date
     data_termino: date
     numero_processo: str
+    valor_estimado: Decimal
     itens: List[RelatorioTotalItem]
     total_geral_paginas: int
     total_geral_valor: Decimal

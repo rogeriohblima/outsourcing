@@ -191,6 +191,9 @@ class Contrato(Base):
         Integer, ForeignKey("comissoes.id"), nullable=False
     )
     numero_processo: Mapped[str] = mapped_column(String(100), nullable=False)
+    valor_estimado: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, default=0
+    )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

@@ -286,6 +286,7 @@ async def relatorio_total(
         data_inicio=contrato.data_inicio,
         data_termino=contrato.data_termino,
         numero_processo=contrato.numero_processo,
+        valor_estimado=contrato.valor_estimado,
         itens=itens,
         total_geral_paginas=total_paginas,
         total_geral_valor=total_valor,

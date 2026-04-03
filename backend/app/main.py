@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -117,6 +118,15 @@ app.include_router(relatorios_router,       prefix=PREFIX)
 # ── Arquivos estáticos (uploads) ──────────────────────────────────────────────
 
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR, check_dir=False), name="uploads")
+
+
+
+# ── Rota raiz ─────────────────────────────────────────────────────────────────
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Redireciona a raiz (/) para a documentacao interativa da API."""
+    return RedirectResponse(url="/docs")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

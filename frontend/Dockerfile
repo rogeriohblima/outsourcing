@@ -15,7 +15,7 @@ COPY package*.json ./
 RUN npm ci --silent
 
 COPY . .
-RUN npm run build
+RUN npm run build:docker
 
 
 # Etapa 2: servidor Nginx

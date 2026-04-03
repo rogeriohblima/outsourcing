@@ -91,6 +91,7 @@ export interface ContratoOut {
   comissao_id: number
   comissao: ComissaoOut
   numero_processo: string
+  valor_estimado: number
   criado_em: string
 }
 
@@ -101,6 +102,7 @@ export interface ContratoForm {
   data_termino: string
   comissao_id: number
   numero_processo: string
+  valor_estimado: number
 }
 
 // ── Fatura ────────────────────────────────────────────────────────────────────
@@ -300,6 +302,7 @@ export interface RelatorioTotal {
   data_inicio: string
   data_termino: string
   numero_processo: string
+  valor_estimado: number
   itens: RelatorioTotalItem[]
   total_geral_paginas: number
   total_geral_valor: number

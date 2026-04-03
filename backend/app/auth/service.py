@@ -29,6 +29,11 @@ settings = get_settings()
 # Usuários de teste para desenvolvimento sem AD
 # NUNCA usar em produção
 _DEV_USERS: dict[str, dict] = {
+    "user": {
+        "password": "user",
+        "nome": "Usuário Local (Dev)",
+        "grupos": ["GRP_SISTEMA_ADMIN"],
+    },
     "admin": {
         "password": "admin123",
         "nome": "Administrador (Dev)",
@@ -133,18 +138,36 @@ def autenticar_usuario(username: str, password: str) -> Optional[dict]:
     """
     Ponto de entrada principal para autenticação.
 
-    Em produção: usa apenas o AD.
-    Em desenvolvimento: tenta o AD primeiro; se falhar (ex.: sem rede),
-    aceita credenciais locais de teste.
+    - APP_ENV=production : usa apenas o AD (sem fallback local).
+    - APP_ENV=development: pula o AD e usa credenciais locais diretamente,
+      evitando o timeout de conexão quando o AD não está acessível.
+    - Outros ambientes   : tenta o AD primeiro; se falhar, usa credenciais locais.
+
+    Credenciais de desenvolvimento (nunca usar em produção):
+      user  / user       — acesso completo
+      admin / admin123   — acesso completo
+      fiscal/ fiscal123  — acesso de fiscal
     """
-    resultado = autenticar_no_ad(username, password)
-
-    if resultado is None and not settings.is_production:
-        logger.warning(
-            "AD indisponível em ambiente de dev — tentando credencial local."
-        )
+    # Em desenvolvimento, pula o AD completamente para evitar timeout
+    if settings.APP_ENV.lower() == "development":
         resultado = _autenticar_dev(username, password)
+        if resultado is None:
+            logger.warning(
+                "Credencial '%s' nao encontrada nos usuarios de dev. "
+                "Usuarios disponiveis: %s",
+                username, list(_DEV_USERS.keys()),
+            )
+        return resultado
 
+    # Em produção: somente AD
+    if settings.is_production:
+        return autenticar_no_ad(username, password)
+
+    # Outros ambientes (testing, staging): tenta AD, fallback local
+    resultado = autenticar_no_ad(username, password)
+    if resultado is None:
+        logger.warning("AD indisponivel — tentando credencial local.")
+        resultado = _autenticar_dev(username, password)
     return resultado
 
 
