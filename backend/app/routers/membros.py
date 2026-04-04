@@ -54,3 +54,4 @@ async def remover(cpf: str, db: AsyncSession = Depends(get_db), _: UserInfo = De
     if not m:
         raise HTTPException(status_code=404, detail="Membro não encontrado.")
     await db.delete(m)
+    await db.flush()

@@ -76,3 +76,4 @@ async def remover(doc_id: int, db: AsyncSession = Depends(get_db), _: UserInfo =
     if not d:
         raise HTTPException(status_code=404, detail="Documento contábil não encontrado.")
     await db.delete(d)
+    await db.flush()

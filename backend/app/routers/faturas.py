@@ -74,3 +74,4 @@ async def remover(fatura_id: int, db: AsyncSession = Depends(get_db), _: UserInf
     if not f:
         raise HTTPException(status_code=404, detail="Fatura não encontrada.")
     await db.delete(f)
+    await db.flush()

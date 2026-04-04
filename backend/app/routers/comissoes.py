@@ -123,3 +123,4 @@ async def remover(comissao_id: int, db: AsyncSession = Depends(get_db), _: UserI
     if not c:
         raise HTTPException(status_code=404, detail="Comissão não encontrada.")
     await db.delete(c)
+    await db.flush()

@@ -54,3 +54,4 @@ async def remover(cnpj: str, db: AsyncSession = Depends(get_db), _: UserInfo = D
     if not e:
         raise HTTPException(status_code=404, detail="Empresa não encontrada.")
     await db.delete(e)
+    await db.flush()

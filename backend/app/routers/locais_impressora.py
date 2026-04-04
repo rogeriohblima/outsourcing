@@ -52,3 +52,4 @@ async def remover(local_id: int, db: AsyncSession = Depends(get_db), _: UserInfo
     if not loc:
         raise HTTPException(status_code=404, detail="Local não encontrado.")
     await db.delete(loc)
+    await db.flush()

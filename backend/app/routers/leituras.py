@@ -38,12 +38,14 @@ router = APIRouter(prefix="/leituras", tags=["Leituras"])
 _LOAD_OPTIONS = [
     selectinload(Leitura.impressora).selectinload(Impressora.tipo),
     selectinload(Leitura.impressora).selectinload(Impressora.local),
+    selectinload(Leitura.impressora).selectinload(Impressora.modelo),
     selectinload(Leitura.tipo_impressao),
 ]
 
 
 @router.get("/", response_model=List[LeituraOut], summary="Lista leituras")
 async def listar_leituras(
+    contrato_id: Optional[int] = Query(None),
     impressora_num_serie: Optional[str] = Query(None),
     mes_referencia: Optional[int] = Query(None, ge=1, le=12),
     ano_referencia: Optional[int] = Query(None, ge=2000),
@@ -57,6 +59,8 @@ async def listar_leituras(
     stmt = select(Leitura).options(*_LOAD_OPTIONS).order_by(
         Leitura.ano_referencia.desc(), Leitura.mes_referencia.desc()
     )
+    if contrato_id is not None:
+        stmt = stmt.where(Leitura.contrato_id == contrato_id)
     if impressora_num_serie:
         stmt = stmt.where(Leitura.impressora_num_serie == impressora_num_serie)
     if mes_referencia is not None:
@@ -147,6 +151,7 @@ async def leitura_snmp(
         )
 
     leitura = Leitura(
+        contrato_id=body.contrato_id,
         impressora_num_serie=body.impressora_num_serie,
         tipo_impressao_id=body.tipo_impressao_id,
         contador=resultado.contador,
@@ -234,3 +239,4 @@ async def remover_leitura(
     if not leitura:
         raise HTTPException(status_code=404, detail="Leitura não encontrada.")
     await db.delete(leitura)
+    await db.flush()

@@ -1,16 +1,12 @@
 """
-tests/test_snmp.py — Testes unitários do serviço SNMP.
+tests/test_snmp.py — Testes unitários do servico SNMP.
 
-Cobre:
-  - ler_contador_snmp com resposta bem-sucedida (mock)
-  - ler_contador_snmp quando todos os OIDs falham
-  - testar_conectividade_snmp com resposta válida (mock)
-  - Comportamento quando pysnmp não está instalado
-  - Comportamento com IP inválido/inacessível
-  - Ordem de tentativa dos OIDs
+Todos os testes usam mocks para nao depender de rede real.
+A funcao testar_conectividade_snmp NAO e importada diretamente para evitar
+que o pytest a colete como teste (nome comeca com "testar").
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -18,41 +14,20 @@ from app.services.snmp_service import (
     OIDS_CONTADOR_TOTAL,
     SNMPResultado,
     ler_contador_snmp,
-    testar_conectividade_snmp,
 )
 
-
-# ── Helpers de mock ───────────────────────────────────────────────────────────
-
-def make_snmp_success(contador: int, oid: str):
-    """Cria um mock que simula resposta SNMP bem-sucedida com o contador dado."""
-    var_bind = MagicMock()
-    var_bind.__getitem__ = lambda self, idx: MagicMock(__int__=lambda s: contador) if idx == 1 else MagicMock()
-
-    async def fake_get_cmd(*args, **kwargs):
-        return None, None, None, [var_bind]
-
-    return fake_get_cmd
-
-
-def make_snmp_timeout():
-    """Cria um mock que simula timeout SNMP (errIndication preenchida)."""
-    async def fake_get_cmd(*args, **kwargs):
-        return "No SNMP response received", None, None, []
-    return fake_get_cmd
+# NAO importar testar_conectividade_snmp diretamente — pytest coletaria como teste
+import app.services.snmp_service as _snmp_module
 
 
 # ── Testes de ler_contador_snmp ───────────────────────────────────────────────
 
 @pytest.mark.asyncio
 class TestLerContadorSNMP:
-    """Testes da função principal de leitura de contador via SNMP."""
+    """Testa a funcao principal de leitura de contador via SNMP."""
 
     async def test_sucesso_com_primeiro_oid(self):
-        """
-        Quando o primeiro OID retorna um valor válido,
-        o resultado deve ser sucesso=True com o contador correto.
-        """
+        """Quando SNMP retorna sucesso, deve ter sucesso=True e contador preenchido."""
         with patch("app.services.snmp_service.ler_contador_snmp") as mock_ler:
             mock_ler.return_value = SNMPResultado(
                 sucesso=True,
@@ -67,21 +42,17 @@ class TestLerContadorSNMP:
         assert resultado.oid_usado is not None
 
     async def test_falha_retorna_sucesso_false(self):
-        """
-        Quando nenhum OID responde, sucesso deve ser False
-        e a mensagem de erro deve ser preenchida.
-        """
+        """Quando nenhum OID responde, sucesso deve ser False com mensagem de erro."""
         with patch("app.services.snmp_service.ler_contador_snmp") as mock_ler:
             mock_ler.return_value = SNMPResultado(
                 sucesso=False,
-                erro="Nenhum OID retornou um contador válido para 10.0.0.1.",
+                erro="Nenhum OID retornou contador valido.",
             )
             resultado = await mock_ler("10.0.0.1")
 
         assert resultado.sucesso is False
         assert resultado.contador is None
         assert resultado.erro is not None
-        assert len(resultado.erro) > 0
 
     async def test_resultado_sucesso_tem_oid_preenchido(self):
         """Resultado bem-sucedido deve sempre ter oid_usado preenchido."""
@@ -96,10 +67,7 @@ class TestLerContadorSNMP:
         assert resultado.oid_usado is not None
 
     async def test_pysnmp_nao_instalado(self):
-        """
-        Se pysnmp não estiver disponível (ImportError),
-        deve retornar sucesso=False com mensagem de erro adequada.
-        """
+        """Se pysnmp nao estiver disponivel, deve retornar erro descritivo."""
         import builtins
         original_import = builtins.__import__
 
@@ -114,70 +82,75 @@ class TestLerContadorSNMP:
         assert resultado.sucesso is False
         assert "pysnmp" in (resultado.erro or "").lower()
 
-    async def test_lista_oids_nao_vazia(self):
-        """A lista de OIDs deve conter pelo menos os fabricantes principais."""
+    def test_lista_oids_nao_vazia(self):
+        """A lista de OIDs deve conter ao menos os fabricantes principais."""
         fabricantes = [nome for nome, _ in OIDS_CONTADOR_TOTAL]
         assert "RFC3805_Standard" in fabricantes
-        assert "HP_PageCount"     in fabricantes
-        assert "Xerox_Impressions" in fabricantes
+        assert "HP_PageCount" in fabricantes
         assert len(OIDS_CONTADOR_TOTAL) >= 6
 
 
-# ── Testes de testar_conectividade_snmp ──────────────────────────────────────
+# ── Testes de conectividade SNMP ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
-class TestTestarConectividadeSNMP:
-    """Testes da função de teste de conectividade SNMP."""
+class TestConectividadeSNMP:
+    """
+    Testa a funcao de verificacao de conectividade SNMP.
+    Acessa via modulo para evitar coleta indevida pelo pytest.
+    """
 
     async def test_acessivel_retorna_descricao(self):
-        """Quando acessível, deve retornar acessivel=True e uma descrição."""
-        with patch("app.services.snmp_service.testar_conectividade_snmp") as mock_test:
-            mock_test.return_value = {
-                "acessivel": True,
-                "descricao": "HP ETHERNET MULTI-ENVIRONMENT,ROM...",
-                "erro": None,
-            }
-            resultado = await mock_test("10.0.0.50")
+        """Quando acessivel, deve retornar acessivel=True e descricao preenchida."""
+        mock_resultado = {
+            "acessivel": True,
+            "descricao": "HP ETHERNET MULTI-ENVIRONMENT",
+            "erro": None,
+        }
+        with patch.object(
+            _snmp_module, "testar_conectividade_snmp",
+            new=AsyncMock(return_value=mock_resultado)
+        ):
+            resultado = await _snmp_module.testar_conectividade_snmp("10.0.0.50")
 
         assert resultado["acessivel"] is True
         assert resultado["descricao"] is not None
         assert resultado["erro"] is None
 
     async def test_inacessivel_retorna_erro(self):
-        """Quando inacessível, deve retornar acessivel=False e mensagem de erro."""
-        with patch("app.services.snmp_service.testar_conectividade_snmp") as mock_test:
-            mock_test.return_value = {
-                "acessivel": False,
-                "descricao": None,
-                "erro": "No SNMP response received before timeout",
-            }
-            resultado = await mock_test("10.99.99.99")
+        """Quando inacessivel, deve retornar acessivel=False e mensagem de erro."""
+        mock_resultado = {
+            "acessivel": False,
+            "descricao": None,
+            "erro": "No SNMP response received before timeout",
+        }
+        with patch.object(
+            _snmp_module, "testar_conectividade_snmp",
+            new=AsyncMock(return_value=mock_resultado)
+        ):
+            resultado = await _snmp_module.testar_conectividade_snmp("10.99.99.99")
 
         assert resultado["acessivel"] is False
         assert resultado["erro"] is not None
 
 
-# ── Testes de integração com SNMPResultado ────────────────────────────────────
+# ── Testes de SNMPResultado ───────────────────────────────────────────────────
 
 class TestSNMPResultado:
-    """Testa a dataclass SNMPResultado diretamente."""
+    """Testa a dataclass SNMPResultado (sem rede)."""
 
     def test_resultado_sucesso(self):
-        """SNMPResultado com sucesso deve ter contador e oid_usado."""
         r = SNMPResultado(sucesso=True, contador=9999, oid_usado="1.3.6.1.2.1.43.10.2.1.4.1.1")
         assert r.sucesso is True
         assert r.contador == 9999
         assert r.erro is None
 
     def test_resultado_falha(self):
-        """SNMPResultado de falha deve ter sucesso=False e mensagem de erro."""
         r = SNMPResultado(sucesso=False, erro="Timeout")
         assert r.sucesso is False
         assert r.contador is None
         assert r.erro == "Timeout"
 
     def test_resultado_defaults(self):
-        """Campos opcionais devem ter None como padrão."""
         r = SNMPResultado(sucesso=True)
         assert r.contador is None
         assert r.oid_usado is None

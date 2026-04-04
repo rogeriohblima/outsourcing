@@ -22,9 +22,12 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Tenta .env.test (testes), .env (dev/prod), na ordem.
+        # Arquivos inexistentes são ignorados silenciosamente.
+        env_file=(".env.test", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",          # ignora variáveis de ambiente extras
     )
 
     # ── Aplicação ────────────────────────────────────────────────────────────

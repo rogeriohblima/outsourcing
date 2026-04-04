@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.auth.dependencies import get_current_user
 from app.auth.schemas import UserInfo
 from app.database import get_db
-from app.models.models import Impressora, LocalImpressora, TipoImpressora
+from app.models.models import Impressora, LocalImpressora, ModeloImpressora, TipoImpressora
 from app.schemas.schemas import (
     ImpressoraCreate,
     ImpressoraOut,
@@ -26,6 +26,7 @@ router = APIRouter(prefix="/impressoras", tags=["Impressoras"])
 _LOAD = [
     selectinload(Impressora.tipo),
     selectinload(Impressora.local),
+    selectinload(Impressora.modelo),
 ]
 
 
@@ -46,7 +47,7 @@ async def listar(
     db: AsyncSession = Depends(get_db),
     _: UserInfo = Depends(get_current_user),
 ):
-    stmt = select(Impressora).options(*_LOAD).offset(skip).limit(limit).order_by(Impressora.nome)
+    stmt = select(Impressora).options(*_LOAD).offset(skip).limit(limit).order_by(Impressora.num_serie)
     if ativa is not None:
         stmt = stmt.where(Impressora.ativa == ativa)
     if local_id is not None:
@@ -90,6 +91,7 @@ async def remover(num_serie: str, db: AsyncSession = Depends(get_db), _: UserInf
     if not imp:
         raise HTTPException(status_code=404, detail="Impressora não encontrada.")
     await db.delete(imp)
+    await db.flush()
 
 
 @router.get(

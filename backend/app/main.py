@@ -27,6 +27,8 @@ from app.routers.documentos_contabeis import router as docs_contabeis_router
 from app.routers.empresas import router as empresas_router
 from app.routers.faturas import router as faturas_router
 from app.routers.impressoras import router as impressoras_router
+from app.routers.modelos_impressora import router as modelos_impressora_router
+from app.routers.franquias import router as franquias_router
 from app.routers.leituras import router as leituras_router
 from app.routers.locais_impressora import router as locais_router
 from app.routers.membros import router as membros_router
@@ -110,8 +112,10 @@ app.include_router(docs_contabeis_router,   prefix=PREFIX)
 app.include_router(tipos_doc_router,        prefix=PREFIX)
 app.include_router(tipos_impressora_router, prefix=PREFIX)
 app.include_router(locais_router,           prefix=PREFIX)
-app.include_router(impressoras_router,      prefix=PREFIX)
+app.include_router(impressoras_router,       prefix=PREFIX)
+app.include_router(modelos_impressora_router, prefix=PREFIX)
 app.include_router(tipos_impressao_router,  prefix=PREFIX)
+app.include_router(franquias_router,        prefix=PREFIX)
 app.include_router(leituras_router,         prefix=PREFIX)
 app.include_router(relatorios_router,       prefix=PREFIX)
 

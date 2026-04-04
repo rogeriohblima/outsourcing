@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/tipos/TiposPage.tsx — Tabelas de domínio em abas.
  *
  * Gerencia em uma única página (com abas):
@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Plus, Trash2 } from 'lucide-react'
-import { tiposDocApi, tiposImpressoraApi, locaisImpressoraApi, tiposImpressaoApi } from '@/api/endpoints'
+import { tiposDocApi, tiposImpressoraApi, locaisImpressoraApi, tiposImpressaoApi, modelosImpressoraApi } from '@/api/endpoints'
 import { AlertMessage, ConfirmDialog, EmptyState, FormField, Modal, PageHeader, PageSpinner, Spinner, formatCurrency } from '@/components/common'
 import { getApiErrorMessage } from '@/api/client'
 
@@ -167,12 +167,80 @@ function TiposImpressaoTab() {
   )
 }
 
+
+// ── Modelos de Impressora ─────────────────────────────────────────────────────
+function ModelosImpressoraTab() {
+  const qc = useQueryClient()
+  const [show, setShow] = useState(false)
+  const [del, setDel] = useState<{ id: number; fabricante: string; modelo: string } | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const { data, isLoading } = useQuery({ queryKey: ['modelos-impressora'], queryFn: () => modelosImpressoraApi.list() })
+  const { register, handleSubmit, reset } = useForm<{ fabricante: string; modelo: string; descricao?: string }>()
+  const createM = useMutation({
+    mutationFn: modelosImpressoraApi.create,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['modelos-impressora'] }); setShow(false); reset() },
+    onError: (e) => setErr(getApiErrorMessage(e))
+  })
+  const deleteM = useMutation({
+    mutationFn: modelosImpressoraApi.remove,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['modelos-impressora'] }); setDel(null) },
+    onError: (e) => setErr(getApiErrorMessage(e))
+  })
+  if (isLoading) return <PageSpinner />
+  return (
+    <div className="space-y-4">
+      {err && <AlertMessage type="error" message={err} onClose={() => setErr(null)} />}
+      <div className="flex justify-end"><button className="btn-primary" onClick={() => setShow(true)}><Plus className="w-4 h-4" /> Novo</button></div>
+      <div className="table-wrapper">
+        <table className="table">
+          <thead><tr><th>Fabricante</th><th>Modelo</th><th>Descricao</th><th className="text-right">Acoes</th></tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {(data ?? []).length === 0 ? <tr><td colSpan={4}><EmptyState /></td></tr>
+              : (data ?? []).map((m) => (
+                <tr key={m.id}>
+                  <td><span className="badge-blue">{m.fabricante}</span></td>
+                  <td className="font-medium">{m.modelo}</td>
+                  <td className="text-xs text-gray-500">{m.descricao ?? '—'}</td>
+                  <td className="text-right"><button onClick={() => setDel(m)} className="btn btn-danger btn-sm"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <Modal isOpen={show} onClose={() => setShow(false)} title="Novo Modelo de Impressora" size="md">
+        <form onSubmit={handleSubmit((d) => createM.mutate(d))} className="space-y-4">
+          <FormField label="Fabricante" required>
+            <input {...register('fabricante')} className="input" placeholder="HP, Xerox, Ricoh..." list="fabricantes-list" />
+            <datalist id="fabricantes-list">
+              {['HP','Xerox','Ricoh','Canon','Lexmark','Brother','Samsung','Epson','Kyocera'].map(f => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+          </FormField>
+          <FormField label="Modelo" required>
+            <input {...register('modelo')} className="input" placeholder="LaserJet Pro M404n" />
+          </FormField>
+          <FormField label="Descricao (opcional)">
+            <input {...register('descricao')} className="input" placeholder="Laser monocromatico A4, 38 ppm" />
+          </FormField>
+          <div className="flex justify-end pt-2"><button type="submit" disabled={createM.isPending} className="btn-primary">{createM.isPending ? <Spinner className="h-4 w-4" /> : 'Cadastrar'}</button></div>
+        </form>
+      </Modal>
+      <ConfirmDialog isOpen={!!del} onClose={() => setDel(null)}
+        onConfirm={() => del && deleteM.mutate(del.id)}
+        message={`Excluir o modelo "${del?.fabricante} ${del?.modelo}"?`}
+        isLoading={deleteM.isPending} />
+    </div>
+  )
+}
+
 // ── Página principal com abas ─────────────────────────────────────────────────
 const ABAS = [
   { key: 'tipos-doc',        label: 'Tipos de Documento' },
   { key: 'tipos-impressora', label: 'Tipos de Impressora' },
   { key: 'locais',           label: 'Locais' },
   { key: 'tipos-impressao',  label: 'Tipos de Impressão' },
+  { key: 'modelos-impressora', label: 'Modelos de Impressora' },
 ] as const
 
 export default function TiposPage() {
@@ -192,6 +260,7 @@ export default function TiposPage() {
       {aba === 'tipos-impressora' && <TiposImpressoraTab />}
       {aba === 'locais'           && <LocaisTab />}
       {aba === 'tipos-impressao'  && <TiposImpressaoTab />}
+      {aba === 'modelos-impressora' && <ModelosImpressoraTab />}
     </div>
   )
 }

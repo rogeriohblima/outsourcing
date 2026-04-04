@@ -1,4 +1,4 @@
-/**
+﻿/**
  * types/index.ts — Tipos TypeScript que espelham os schemas Pydantic do backend.
  *
  * Convenção de nomenclatura:
@@ -111,6 +111,9 @@ export interface FaturaOut {
   id: number
   numero: string
   data: string
+  mes_referencia: number
+  ano_referencia: number
+  valor: number
   contrato_id: number
   contrato: ContratoResumo
   criado_em: string
@@ -119,6 +122,9 @@ export interface FaturaOut {
 export interface FaturaForm {
   numero: string
   data: string
+  mes_referencia: number
+  ano_referencia: number
+  valor: number
   contrato_id: number
 }
 
@@ -153,6 +159,21 @@ export interface DocumentoContabilForm {
   valor: number
 }
 
+// ── Modelo de Impressora ─────────────────────────────────────────────────────
+
+export interface ModeloImpressoraOut {
+  id: number
+  fabricante: string
+  modelo: string
+  descricao?: string
+}
+
+export interface ModeloImpressoraForm {
+  fabricante: string
+  modelo: string
+  descricao?: string
+}
+
 // ── Tipo de Impressora ────────────────────────────────────────────────────────
 
 export interface TipoImpressoraOut {
@@ -181,7 +202,8 @@ export interface LocalImpressoraForm {
 
 export interface ImpressoraOut {
   num_serie: string
-  nome: string
+  modelo_id?: number
+  modelo?: ModeloImpressoraOut
   tipo_id: number
   tipo: TipoImpressoraOut
   local_id: number
@@ -193,7 +215,7 @@ export interface ImpressoraOut {
 
 export interface ImpressoraForm {
   num_serie: string
-  nome: string
+  modelo_id?: number
   tipo_id: number
   local_id: number
   ip?: string
@@ -217,10 +239,58 @@ export interface TipoImpressaoForm {
   valor_extra_franquia: number
 }
 
+// ── Franquia do Contrato ─────────────────────────────────────────────────────
+
+export interface FranquiaContratoOut {
+  id: number
+  contrato_id: number
+  tipo_impressao_id: number
+  tipo_impressao: TipoImpressaoOut
+  paginas_franquia: number
+  valor_mensal_franquia: number
+}
+
+export interface FranquiaContratoForm {
+  contrato_id: number
+  tipo_impressao_id: number
+  paginas_franquia: number
+  valor_mensal_franquia: number
+}
+
+// ── Tabela de Preços ──────────────────────────────────────────────────────────
+
+export interface TabelaPrecoOut {
+  id: number
+  contrato_id: number
+  tipo_impressao_id: number
+  tipo_impressao: TipoImpressaoOut
+  valor_dentro_franquia: number
+  valor_fora_franquia: number
+  vigente_de: string
+  vigente_ate?: string
+  criado_em: string
+}
+
+export interface TabelaPrecoForm {
+  contrato_id: number
+  tipo_impressao_id: number
+  valor_dentro_franquia: number
+  valor_fora_franquia: number
+  vigente_de: string
+}
+
+export interface ReajustePrecoForm {
+  tipo_impressao_id: number
+  valor_dentro_franquia: number
+  valor_fora_franquia: number
+  vigente_de: string
+}
+
 // ── Leitura ───────────────────────────────────────────────────────────────────
 
 export interface LeituraOut {
   id: number
+  contrato_id: number
   impressora_num_serie: string
   impressora: ImpressoraOut
   tipo_impressao_id: number
@@ -235,6 +305,7 @@ export interface LeituraOut {
 }
 
 export interface LeituraManualForm {
+  contrato_id: number
   impressora_num_serie: string
   tipo_impressao_id: number
   contador: number
@@ -245,6 +316,7 @@ export interface LeituraManualForm {
 }
 
 export interface LeituraSNMPForm {
+  contrato_id: number
   impressora_num_serie: string
   tipo_impressao_id: number
   mes_referencia: number
@@ -270,11 +342,13 @@ export interface RelatorioMensalItem {
   contador_inicial: number
   contador_final: number
   paginas_impressas: number
-  franquia: number
+  paginas_franquia_total: number
+  paginas_acumuladas_ate_mes: number
   paginas_dentro_franquia: number
-  paginas_excedente: number
-  valor_franquia: number
-  valor_excedente: number
+  paginas_fora_franquia: number
+  valor_mensal_franquia: number
+  valor_dentro_franquia: number
+  valor_fora_franquia: number
   valor_total: number
 }
 
@@ -285,6 +359,11 @@ export interface RelatorioMensal {
   ano: number
   itens: RelatorioMensalItem[]
   total_paginas: number
+  total_paginas_acumuladas: number
+  paginas_franquia_total: number
+  percentual_franquia_consumida: number
+  total_custo_fixo: number
+  total_variavel: number
   total_valor: number
   percentual_orcamento?: number
   percentual_tempo?: number

@@ -6,11 +6,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Settings2 } from 'lucide-react'
 import { comissoesApi, contratosApi, empresasApi } from '@/api/endpoints'
+import FranquiasPage from './FranquiasPage'
 import {
   AlertMessage, ConfirmDialog, EmptyState, FormField,
-  Modal, PageHeader, PageSpinner, Spinner, formatDate, formatDateTime,
+  Modal, PageHeader, PageSpinner, Spinner, formatCurrency, formatDate, formatDateTime,
 } from '@/components/common'
 import { getApiErrorMessage } from '@/api/client'
 import type { ContratoOut } from '@/types'
@@ -82,6 +83,7 @@ export default function ContratosPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [editItem, setEditItem] = useState<ContratoOut | null>(null)
   const [deleteItem, setDeleteItem] = useState<ContratoOut | null>(null)
+  const [franquiaContrato, setFranquiaContrato] = useState<ContratoOut | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
 
   const { data: contratos, isLoading } = useQuery({ queryKey: ['contratos'], queryFn: contratosApi.list })
@@ -123,7 +125,8 @@ export default function ContratosPage() {
                     <td>{vigente ? <span className="badge-green">Vigente</span> : new Date(c.data_termino) < hoje ? <span className="badge-red">Encerrado</span> : <span className="badge-yellow">A iniciar</span>}</td>
                     <td className="text-right">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => { setApiError(null); setEditItem(c) }} className="btn btn-secondary btn-sm"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setFranquiaContrato(c)} className="btn btn-secondary btn-sm" title="Franquias e Preços"><Settings2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setApiError(null); setEditItem(c) }} className="btn btn-secondary btn-sm"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => setDeleteItem(c)} className="btn btn-danger btn-sm"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -140,6 +143,14 @@ export default function ContratosPage() {
         {editItem && <ContratoForm defaultValues={{ ...editItem, comissao_id: editItem.comissao_id }}
           onSubmit={(d) => updateM.mutate({ id: editItem.id, data: d })} isLoading={updateM.isPending} editMode />}
       </Modal>
+      {/* Modal — Franquias e Preços */}
+      <Modal isOpen={!!franquiaContrato} onClose={() => setFranquiaContrato(null)}
+        title="" size="xl">
+        {franquiaContrato && (
+          <FranquiasPage contrato={franquiaContrato} onClose={() => setFranquiaContrato(null)} />
+        )}
+      </Modal>
+
       <ConfirmDialog isOpen={!!deleteItem} onClose={() => setDeleteItem(null)}
         onConfirm={() => deleteItem && deleteM.mutate(deleteItem.id)}
         message={`Excluir o contrato "${deleteItem?.numero}"? Faturas e documentos vinculados também serão removidos.`}

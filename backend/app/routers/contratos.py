@@ -3,6 +3,7 @@ routers/contratos.py — CRUD de Contratos.
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -46,7 +47,11 @@ async def criar(body: ContratoCreate, db: AsyncSession = Depends(get_db), _: Use
 
     c = Contrato(**body.model_dump())
     db.add(c)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Numero de contrato ja cadastrado.")
     return await _get_or_404(c.id, db)
 
 
@@ -72,3 +77,4 @@ async def remover(contrato_id: int, db: AsyncSession = Depends(get_db), _: UserI
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado.")
     await db.delete(c)
+    await db.flush()

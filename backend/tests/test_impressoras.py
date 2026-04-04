@@ -37,7 +37,6 @@ class TestImpressoras:
         """Criação com dados válidos deve retornar HTTP 201 com tipo e local expandidos."""
         payload = {
             "num_serie": "HP-LJ-0001",
-            "nome": "HP LaserJet Pro",
             "tipo_id": tipo_impressora.id,
             "local_id": local_impressora.id,
             "ip": "10.0.0.50",
@@ -60,7 +59,6 @@ class TestImpressoras:
         """Tentar cadastrar número de série já existente deve retornar 409."""
         payload = {
             "num_serie": impressora_fixture.num_serie,
-            "nome": "Duplicada",
             "tipo_id": impressora_fixture.tipo_id,
             "local_id": impressora_fixture.local_id,
         }
@@ -76,7 +74,6 @@ class TestImpressoras:
         """Tipo de impressora inexistente deve retornar 404."""
         payload = {
             "num_serie": "SN-TIPO-INVALIDO",
-            "nome": "Teste",
             "tipo_id": 99999,
             "local_id": local_impressora.id,
         }
@@ -134,7 +131,6 @@ class TestImpressoras:
             "/api/v1/impressoras/",
             json={
                 "num_serie": "PARA-DELETAR-001",
-                "nome": "Impressora a remover",
                 "tipo_id": tipo_impressora.id,
                 "local_id": local_impressora.id,
             },

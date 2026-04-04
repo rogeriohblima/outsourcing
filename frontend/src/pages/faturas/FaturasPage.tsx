@@ -1,5 +1,7 @@
-/**
+﻿/**
  * pages/faturas/FaturasPage.tsx — CRUD de Faturas.
+ *
+ * Campos: número, data emissão, mês/ano de referência, valor, contrato.
  */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,79 +10,172 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Trash2 } from 'lucide-react'
 import { contratosApi, faturasApi } from '@/api/endpoints'
-import { AlertMessage, ConfirmDialog, EmptyState, FormField, Modal, PageHeader, PageSpinner, Spinner, formatDate } from '@/components/common'
+import {
+  AlertMessage, ConfirmDialog, EmptyState, FormField,
+  Modal, PageHeader, PageSpinner, Spinner, formatCurrency, formatDate,
+} from '@/components/common'
 import { getApiErrorMessage } from '@/api/client'
 import type { FaturaOut } from '@/types'
 
-const schema = z.object({ numero: z.string().min(1), data: z.string().min(1), contrato_id: z.coerce.number().min(1) })
+const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+               'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+const schema = z.object({
+  numero:         z.string().min(1, 'Obrigatório'),
+  data:           z.string().min(1, 'Obrigatório'),
+  mes_referencia: z.coerce.number().min(1).max(12),
+  ano_referencia: z.coerce.number().min(2000).max(2100),
+  valor:          z.coerce.number().min(0, 'Informe o valor'),
+  contrato_id:    z.coerce.number().min(1, 'Selecione o contrato'),
+})
 type FormData = z.infer<typeof schema>
 
 export default function FaturasPage() {
   const qc = useQueryClient()
   const [filterContrato, setFilterContrato] = useState<number | undefined>()
-  const [showCreate, setShowCreate] = useState(false)
-  const [deleteItem, setDeleteItem] = useState<FaturaOut | null>(null)
-  const [apiError, setApiError] = useState<string | null>(null)
+  const [showCreate, setShowCreate]         = useState(false)
+  const [deleteItem, setDeleteItem]         = useState<FaturaOut | null>(null)
+  const [apiError, setApiError]             = useState<string | null>(null)
 
   const { data: contratos } = useQuery({ queryKey: ['contratos'], queryFn: contratosApi.list })
-  const { data: faturas, isLoading } = useQuery({ queryKey: ['faturas', filterContrato], queryFn: () => faturasApi.list(filterContrato) })
+  const { data: faturas, isLoading } = useQuery({
+    queryKey: ['faturas', filterContrato],
+    queryFn: () => faturasApi.list(filterContrato),
+  })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      mes_referencia: new Date().getMonth() + 1,
+      ano_referencia: new Date().getFullYear(),
+    },
+  })
 
-  const createM = useMutation({ mutationFn: faturasApi.create,
+  const createM = useMutation({
+    mutationFn: faturasApi.create,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['faturas'] }); setShowCreate(false); reset() },
-    onError: (e) => setApiError(getApiErrorMessage(e)) })
-  const deleteM = useMutation({ mutationFn: (id: number) => faturasApi.remove(id),
+    onError: (e) => setApiError(getApiErrorMessage(e)),
+  })
+  const deleteM = useMutation({
+    mutationFn: (id: number) => faturasApi.remove(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['faturas'] }); setDeleteItem(null) },
-    onError: (e) => setApiError(getApiErrorMessage(e)) })
+    onError: (e) => setApiError(getApiErrorMessage(e)),
+  })
 
   if (isLoading) return <PageSpinner />
 
   return (
     <div>
       <PageHeader title="Faturas" subtitle="Faturas emitidas pelas empresas contratadas"
-        actions={<button className="btn-primary" onClick={() => { setApiError(null); setShowCreate(true) }}><Plus className="w-4 h-4" /> Nova Fatura</button>} />
-      {apiError && <div className="mb-4"><AlertMessage type="error" message={apiError} onClose={() => setApiError(null)} /></div>}
+        actions={
+          <button className="btn-primary" onClick={() => { setApiError(null); setShowCreate(true) }}>
+            <Plus className="w-4 h-4" /> Nova Fatura
+          </button>
+        } />
+
+      {apiError && (
+        <div className="mb-4">
+          <AlertMessage type="error" message={apiError} onClose={() => setApiError(null)} />
+        </div>
+      )}
+
+      {/* Filtro */}
       <div className="card mb-4 flex gap-3 items-end">
         <div>
           <label className="label">Filtrar por contrato</label>
-          <select className="input w-72" value={filterContrato ?? ''} onChange={(e) => setFilterContrato(e.target.value ? Number(e.target.value) : undefined)}>
+          <select className="input w-72" value={filterContrato ?? ''}
+            onChange={(e) => setFilterContrato(e.target.value ? Number(e.target.value) : undefined)}>
             <option value="">Todos os contratos</option>
-            {contratos?.map((c) => <option key={c.id} value={c.id}>{c.numero} — {c.empresa.nome}</option>)}
+            {contratos?.map((c) => (
+              <option key={c.id} value={c.id}>{c.numero} — {c.empresa.nome}</option>
+            ))}
           </select>
         </div>
       </div>
+
+      {/* Tabela */}
       <div className="table-wrapper">
         <table className="table">
-          <thead><tr><th>Número</th><th>Data</th><th>Contrato</th><th>Empresa</th><th className="text-right">Ações</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Referência</th>
+              <th>Data Emissão</th>
+              <th className="text-right">Valor</th>
+              <th>Contrato</th>
+              <th>Empresa</th>
+              <th className="text-right">Ações</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-gray-100">
-            {(faturas ?? []).length === 0 ? <tr><td colSpan={5}><EmptyState /></td></tr>
+            {(faturas ?? []).length === 0
+              ? <tr><td colSpan={7}><EmptyState /></td></tr>
               : (faturas ?? []).map((f) => (
                 <tr key={f.id}>
-                  <td className="font-medium">{f.numero}</td>
-                  <td>{formatDate(f.data)}</td>
-                  <td className="text-fab-700 font-medium">{f.contrato.numero}</td>
+                  <td className="font-medium font-mono text-sm">{f.numero}</td>
+                  <td>
+                    <span className="badge-blue">
+                      {MESES[f.mes_referencia]}/{f.ano_referencia}
+                    </span>
+                  </td>
+                  <td className="text-sm">{formatDate(f.data)}</td>
+                  <td className="text-right font-semibold text-emerald-700">
+                    {formatCurrency(f.valor)}
+                  </td>
+                  <td className="text-fab-700 font-medium text-sm">{f.contrato.numero}</td>
                   <td className="text-sm text-gray-600">{f.contrato.empresa.nome}</td>
-                  <td className="text-right"><button onClick={() => setDeleteItem(f)} className="btn btn-danger btn-sm"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                  <td className="text-right">
+                    <button onClick={() => setDeleteItem(f)} className="btn btn-danger btn-sm">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
                 </tr>
-              ))}
+              ))
+            }
           </tbody>
         </table>
       </div>
-      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Nova Fatura">
+
+      {/* Modal criar */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Nova Fatura" size="md">
         <form onSubmit={handleSubmit((d) => createM.mutate(d))} className="space-y-4">
           <FormField label="Número da Fatura" error={errors.numero?.message} required>
             <input {...register('numero')} className="input" placeholder="NF-000001" />
           </FormField>
-          <FormField label="Data" error={errors.data?.message} required>
-            <input {...register('data')} type="date" className="input" />
-          </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Mês de referência" error={errors.mes_referencia?.message} required>
+              <select {...register('mes_referencia')} className="input">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{MESES[m]}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Ano de referência" error={errors.ano_referencia?.message} required>
+              <input {...register('ano_referencia')} type="number" className="input"
+                min={2000} max={2100} />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Data de emissão" error={errors.data?.message} required>
+              <input {...register('data')} type="date" className="input" />
+            </FormField>
+            <FormField label="Valor (R$)" error={errors.valor?.message} required>
+              <input {...register('valor')} type="number" step="0.01" min={0}
+                className="input" placeholder="1500.00" />
+            </FormField>
+          </div>
+
           <FormField label="Contrato" error={errors.contrato_id?.message} required>
             <select {...register('contrato_id')} className="input">
               <option value="">Selecione…</option>
-              {contratos?.map((c) => <option key={c.id} value={c.id}>{c.numero} — {c.empresa.nome}</option>)}
+              {contratos?.map((c) => (
+                <option key={c.id} value={c.id}>{c.numero} — {c.empresa.nome}</option>
+              ))}
             </select>
           </FormField>
+
           <div className="flex justify-end pt-2">
             <button type="submit" disabled={createM.isPending} className="btn-primary">
               {createM.isPending ? <Spinner className="h-4 w-4" /> : 'Cadastrar'}
@@ -88,9 +183,11 @@ export default function FaturasPage() {
           </div>
         </form>
       </Modal>
+
       <ConfirmDialog isOpen={!!deleteItem} onClose={() => setDeleteItem(null)}
         onConfirm={() => deleteItem && deleteM.mutate(deleteItem.id)}
-        message={`Excluir a fatura "${deleteItem?.numero}"?`} isLoading={deleteM.isPending} />
+        message={`Excluir a fatura "${deleteItem?.numero}" (${deleteItem ? MESES[deleteItem.mes_referencia] : ''}/${deleteItem?.ano_referencia})?`}
+        isLoading={deleteM.isPending} />
     </div>
   )
 }

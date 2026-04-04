@@ -172,8 +172,10 @@ export default function RelatoriosPage() {
                             <th>Impressora</th><th>Setor</th><th>Tipo</th>
                             <th className="text-right">Páginas</th>
                             <th className="text-right">Dentro Franquia</th>
-                            <th className="text-right">Excedente</th>
-                            <th className="text-right">Valor Total</th>
+                            <th className="text-right">Fora Franquia</th>
+                            <th className="text-right">Fixo</th>
+                            <th className="text-right">Variável</th>
+                            <th className="text-right">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -184,7 +186,9 @@ export default function RelatoriosPage() {
                               <td className="text-xs">{item.tipo_impressao}</td>
                               <td className="text-right font-mono">{item.paginas_impressas.toLocaleString('pt-BR')}</td>
                               <td className="text-right font-mono text-emerald-600">{item.paginas_dentro_franquia.toLocaleString('pt-BR')}</td>
-                              <td className="text-right font-mono text-red-500">{item.paginas_excedente.toLocaleString('pt-BR')}</td>
+                              <td className="text-right font-mono text-amber-600">{item.paginas_fora_franquia.toLocaleString('pt-BR')}</td>
+                              <td className="text-right font-mono text-gray-600">{formatCurrency(item.valor_mensal_franquia)}</td>
+                              <td className="text-right font-mono">{formatCurrency(Number(item.valor_dentro_franquia) + Number(item.valor_fora_franquia))}</td>
                               <td className="text-right font-semibold text-fab-700">{formatCurrency(item.valor_total)}</td>
                             </tr>
                           ))}
@@ -192,6 +196,8 @@ export default function RelatoriosPage() {
                             <td colSpan={3} className="text-right">TOTAL</td>
                             <td className="text-right font-mono">{relMensal.total_paginas.toLocaleString('pt-BR')}</td>
                             <td colSpan={2}></td>
+                            <td className="text-right text-gray-600">{formatCurrency(relMensal.total_custo_fixo)}</td>
+                            <td className="text-right">{formatCurrency(relMensal.total_variavel)}</td>
                             <td className="text-right text-fab-700">{formatCurrency(relMensal.total_valor)}</td>
                           </tr>
                         </tbody>

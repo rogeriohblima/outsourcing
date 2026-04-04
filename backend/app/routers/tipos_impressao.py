@@ -52,3 +52,4 @@ async def remover(tipo_id: int, db: AsyncSession = Depends(get_db), _: UserInfo 
     if not t:
         raise HTTPException(status_code=404, detail="Tipo de impressão não encontrado.")
     await db.delete(t)
+    await db.flush()

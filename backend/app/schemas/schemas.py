@@ -160,8 +160,11 @@ class ContratoResumo(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class FaturaBase(BaseModel):
-    numero: str = Field(..., max_length=100)
-    data: date
+    numero: str = Field(..., max_length=100, description="Número da fatura emitida pela empresa")
+    data: date = Field(..., description="Data de emissão da fatura")
+    mes_referencia: int = Field(..., ge=1, le=12, description="Mês de referência da fatura")
+    ano_referencia: int = Field(..., ge=2000, le=2100, description="Ano de referência da fatura")
+    valor: Decimal = Field(..., ge=0, decimal_places=2, description="Valor total da fatura (R$)")
     contrato_id: int
 
 
@@ -172,6 +175,9 @@ class FaturaCreate(FaturaBase):
 class FaturaUpdate(BaseModel):
     numero: Optional[str] = None
     data: Optional[date] = None
+    mes_referencia: Optional[int] = Field(None, ge=1, le=12)
+    ano_referencia: Optional[int] = Field(None, ge=2000, le=2100)
+    valor: Optional[Decimal] = None
     contrato_id: Optional[int] = None
 
 
@@ -236,6 +242,32 @@ class DocumentoContabilOut(DocumentoContabilBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Modelo de Impressora
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ModeloImpressoraBase(BaseModel):
+    fabricante: str = Field(..., max_length=100, description="Ex: HP, Xerox, Ricoh, Canon, Lexmark")
+    modelo: str = Field(..., max_length=200, description="Ex: LaserJet Pro M404n")
+    descricao: Optional[str] = Field(None, max_length=500, description="Velocidade, resolucao, etc.")
+
+
+class ModeloImpressoraCreate(ModeloImpressoraBase):
+    pass
+
+
+class ModeloImpressoraUpdate(BaseModel):
+    fabricante: Optional[str] = None
+    modelo: Optional[str] = None
+    descricao: Optional[str] = None
+
+
+class ModeloImpressoraOut(ModeloImpressoraBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tipo de Impressora
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -288,10 +320,10 @@ class LocalImpressoraOut(LocalImpressoraBase):
 
 class ImpressoraBase(BaseModel):
     num_serie: str = Field(..., max_length=100)
-    nome: str = Field(..., max_length=200)
     tipo_id: int
     local_id: int
-    ip: Optional[str] = Field(None, max_length=45, description="Endereço IP para consulta SNMP")
+    modelo_id: Optional[int] = Field(None, description="ID do modelo da impressora")
+    ip: Optional[str] = Field(None, max_length=45, description="Endereco IP para consulta SNMP")
     ativa: bool = True
 
 
@@ -300,14 +332,15 @@ class ImpressoraCreate(ImpressoraBase):
 
 
 class ImpressoraUpdate(BaseModel):
-    nome: Optional[str] = None
     tipo_id: Optional[int] = None
     local_id: Optional[int] = None
+    modelo_id: Optional[int] = None
     ip: Optional[str] = None
     ativa: Optional[bool] = None
 
 
 class ImpressoraOut(ImpressoraBase):
+    modelo: Optional[ModeloImpressoraOut] = None
     tipo: TipoImpressoraOut
     local: LocalImpressoraOut
     criado_em: datetime
@@ -321,9 +354,6 @@ class ImpressoraOut(ImpressoraBase):
 
 class TipoImpressaoBase(BaseModel):
     descricao: str = Field(..., max_length=200, description="Ex: P&B A4, Colorida A4")
-    franquia: int = Field(..., ge=0, description="Quantidade de páginas na franquia mensal")
-    valor_franquia: Decimal = Field(..., ge=0, decimal_places=2, description="Valor mensal da franquia (R$)")
-    valor_extra_franquia: Decimal = Field(..., ge=0, decimal_places=2, description="Valor por página excedente (R$)")
 
 
 class TipoImpressaoCreate(TipoImpressaoBase):
@@ -332,9 +362,6 @@ class TipoImpressaoCreate(TipoImpressaoBase):
 
 class TipoImpressaoUpdate(BaseModel):
     descricao: Optional[str] = None
-    franquia: Optional[int] = None
-    valor_franquia: Optional[Decimal] = None
-    valor_extra_franquia: Optional[Decimal] = None
 
 
 class TipoImpressaoOut(TipoImpressaoBase):
@@ -344,10 +371,74 @@ class TipoImpressaoOut(TipoImpressaoBase):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Franquia do Contrato
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FranquiaContratoBase(BaseModel):
+    contrato_id: int
+    tipo_impressao_id: int
+    paginas_franquia: int = Field(..., ge=1, description="Total de páginas no contrato inteiro")
+    valor_mensal_franquia: Decimal = Field(..., ge=0, decimal_places=2,
+        description="Custo fixo mensal pago independente do uso (R$)")
+
+
+class FranquiaContratoCreate(FranquiaContratoBase):
+    pass
+
+
+class FranquiaContratoUpdate(BaseModel):
+    paginas_franquia: Optional[int] = None
+    valor_mensal_franquia: Optional[Decimal] = None
+
+
+class FranquiaContratoOut(FranquiaContratoBase):
+    id: int
+    tipo_impressao: TipoImpressaoOut
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Tabela de Preços
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TabelaPrecoBase(BaseModel):
+    contrato_id: int
+    tipo_impressao_id: int
+    valor_dentro_franquia: Decimal = Field(..., ge=0, decimal_places=6,
+        description="Preço por página dentro da franquia total (R$)")
+    valor_fora_franquia: Decimal = Field(..., ge=0, decimal_places=6,
+        description="Preço por página além da franquia total (R$)")
+    vigente_de: date = Field(..., description="Data de início da vigência deste preço")
+
+
+class TabelaPrecoCreate(TabelaPrecoBase):
+    pass
+
+
+class TabelaPrecoOut(TabelaPrecoBase):
+    id: int
+    vigente_ate: Optional[date] = None
+    tipo_impressao: TipoImpressaoOut
+    criado_em: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReajustePrecoRequest(BaseModel):
+    """Schema para registrar um reajuste de preços em um contrato."""
+    tipo_impressao_id: int
+    valor_dentro_franquia: Decimal = Field(..., ge=0, decimal_places=6)
+    valor_fora_franquia: Decimal = Field(..., ge=0, decimal_places=6)
+    vigente_de: date = Field(..., description="Data de início do novo preço")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Leitura
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class LeituraBase(BaseModel):
+    contrato_id: int = Field(..., description="Contrato ao qual esta leitura pertence")
     impressora_num_serie: str
     tipo_impressao_id: int
     contador: int = Field(..., ge=0, description="Valor do totalizador (contador acumulado)")
@@ -367,6 +458,7 @@ class LeituraSNMPRequest(BaseModel):
     Schema para solicitar leitura automática via SNMP.
     O sistema tenta ler o contador e salva o resultado.
     """
+    contrato_id: int
     impressora_num_serie: str
     tipo_impressao_id: int
     mes_referencia: int = Field(..., ge=1, le=12)
@@ -413,11 +505,15 @@ class RelatorioMensalItem(BaseModel):
     contador_inicial: int
     contador_final: int
     paginas_impressas: int
-    franquia: int
-    paginas_dentro_franquia: int
-    paginas_excedente: int
-    valor_franquia: Decimal
-    valor_excedente: Decimal
+    # Contexto da franquia total do contrato
+    paginas_franquia_total: int       # franquia total do contrato
+    paginas_acumuladas_ate_mes: int   # total impresso até este mês no contrato
+    paginas_dentro_franquia: int      # páginas deste mês dentro da franquia
+    paginas_fora_franquia: int        # páginas deste mês fora da franquia
+    # Valores usando a tabela de preços vigente na data da leitura
+    valor_mensal_franquia: Decimal    # custo fixo mensal
+    valor_dentro_franquia: Decimal    # valor das págs dentro
+    valor_fora_franquia: Decimal      # valor das págs fora
     valor_total: Decimal
 
 
@@ -429,6 +525,11 @@ class RelatorioMensal(BaseModel):
     ano: int
     itens: List[RelatorioMensalItem]
     total_paginas: int
+    total_paginas_acumuladas: int     # total acumulado desde o início do contrato
+    paginas_franquia_total: int       # franquia total contratada
+    percentual_franquia_consumida: float  # % da franquia já consumida
+    total_custo_fixo: Decimal         # soma dos custos fixos mensais
+    total_variavel: Decimal           # soma dos valores variáveis (dentro + fora)
     total_valor: Decimal
     percentual_orcamento: Optional[float] = None
     percentual_tempo: Optional[float] = None

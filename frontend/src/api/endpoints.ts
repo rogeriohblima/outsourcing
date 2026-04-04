@@ -1,4 +1,4 @@
-/**
+﻿/**
  * api/endpoints.ts — Funções de chamada para cada endpoint da API.
  *
  * Organizado por entidade. Cada função corresponde a um endpoint REST.
@@ -7,6 +7,9 @@
 
 import api from './client'
 import type {
+  FranquiaContratoForm, FranquiaContratoOut,
+  ReajustePrecoForm,
+  TabelaPrecoForm, TabelaPrecoOut,
   ComissaoForm, ComissaoOut,
   ContratoForm, ContratoOut,
   DocumentoContabilForm, DocumentoContabilOut,
@@ -14,6 +17,7 @@ import type {
   EvolucaoMensalItem,
   FaturaForm, FaturaOut,
   ImpressoraForm, ImpressoraOut,
+  ModeloImpressoraForm, ModeloImpressoraOut,
   LeituraManualForm, LeituraOut, LeituraSNMPForm,
   LocalImpressoraForm, LocalImpressoraOut,
   MembroForm, MembroOut,
@@ -141,6 +145,18 @@ export const locaisImpressoraApi = {
   remove: (id: number) => api.delete(`/locais-impressora/${id}`),
 }
 
+// ── Modelos de Impressora ─────────────────────────────────────────────────────
+
+export const modelosImpressoraApi = {
+  list:   (fabricante?: string) =>
+    api.get<ModeloImpressoraOut[]>('/modelos-impressora/', { params: { fabricante } }).then(r => r.data),
+  create: (d: ModeloImpressoraForm) =>
+    api.post<ModeloImpressoraOut>('/modelos-impressora/', d).then(r => r.data),
+  update: (id: number, d: Partial<ModeloImpressoraForm>) =>
+    api.patch<ModeloImpressoraOut>(`/modelos-impressora/${id}`, d).then(r => r.data),
+  remove: (id: number) => api.delete(`/modelos-impressora/${id}`),
+}
+
 // ── Impressoras ───────────────────────────────────────────────────────────────
 
 export const impressorasApi = {
@@ -165,10 +181,33 @@ export const tiposImpressaoApi = {
   remove: (id: number) => api.delete(`/tipos-impressao/${id}`),
 }
 
+// ── Franquias do Contrato ─────────────────────────────────────────────────────
+
+export const franquiasApi = {
+  listByContrato: (contratoId: number) =>
+    api.get<FranquiaContratoOut[]>(`/franquias/${contratoId}`).then(r => r.data),
+  create: (d: FranquiaContratoForm) =>
+    api.post<FranquiaContratoOut>('/franquias/', d).then(r => r.data),
+  update: (id: number, d: Partial<FranquiaContratoForm>) =>
+    api.put<FranquiaContratoOut>(`/franquias/${id}`, d).then(r => r.data),
+  remove: (id: number) => api.delete(`/franquias/${id}`),
+}
+
+// ── Tabelas de Preço ──────────────────────────────────────────────────────────
+
+export const tabelasPrecoApi = {
+  listByContrato: (contratoId: number) =>
+    api.get<TabelaPrecoOut[]>(`/tabelas-preco/${contratoId}`).then(r => r.data),
+  create: (d: TabelaPrecoForm) =>
+    api.post<TabelaPrecoOut>('/tabelas-preco/', d).then(r => r.data),
+  reajustar: (contratoId: number, d: ReajustePrecoForm) =>
+    api.post<TabelaPrecoOut>(`/tabelas-preco/${contratoId}/reajuste`, d).then(r => r.data),
+}
+
 // ── Leituras ──────────────────────────────────────────────────────────────────
 
 export const leiturasApi = {
-  list: (params?: { impressora_num_serie?: string; mes_referencia?: number; ano_referencia?: number; manual?: boolean }) =>
+  list: (params?: { contrato_id?: number; impressora_num_serie?: string; mes_referencia?: number; ano_referencia?: number; manual?: boolean }) =>
     api.get<LeituraOut[]>('/leituras/', { params }).then(r => r.data),
   listByImpressora: (numSerie: string) =>
     api.get<LeituraOut[]>(`/leituras/impressora/${numSerie}`).then(r => r.data),

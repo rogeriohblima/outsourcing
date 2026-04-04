@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/impressoras/ImpressorasPage.tsx — CRUD de Impressoras.
  *
  * Funcionalidades:
@@ -15,7 +15,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Activity, Pencil, Plus, Search, Trash2, Wifi, WifiOff } from 'lucide-react'
-import { impressorasApi, locaisImpressoraApi, tiposImpressoraApi } from '@/api/endpoints'
+import { impressorasApi, locaisImpressoraApi, modelosImpressoraApi, tiposImpressoraApi } from '@/api/endpoints'
 import {
   AlertMessage, ConfirmDialog, EmptyState, FormField,
   Modal, PageHeader, PageSpinner, Spinner, StatusBadge, formatDateTime,
@@ -24,10 +24,10 @@ import { getApiErrorMessage } from '@/api/client'
 import type { ImpressoraOut } from '@/types'
 
 const schema = z.object({
-  num_serie: z.string().min(1, 'Obrigatório').max(100),
-  nome:      z.string().min(1, 'Obrigatório').max(200),
-  tipo_id:   z.coerce.number().min(1, 'Selecione o tipo'),
-  local_id:  z.coerce.number().min(1, 'Selecione o local'),
+  num_serie:  z.string().min(1, 'Obrigatório').max(100),
+  modelo_id:  z.coerce.number().optional(),
+  tipo_id:    z.coerce.number().min(1, 'Selecione o tipo'),
+  local_id:   z.coerce.number().min(1, 'Selecione o local'),
   ip:        z.string().max(45).optional().or(z.literal('')),
   ativa:     z.boolean(),
 })
@@ -41,21 +41,34 @@ function ImpressoraForm({ defaultValues, onSubmit, isLoading, editMode }: {
     resolver: zodResolver(schema),
     defaultValues: { ativa: true, ...defaultValues },
   })
+  const { data: modelos } = useQuery({ queryKey: ['modelos-impressora'], queryFn: () => modelosImpressoraApi.list() })
   const { data: tipos } = useQuery({ queryKey: ['tipos-impressora'], queryFn: tiposImpressoraApi.list })
   const { data: locais } = useQuery({ queryKey: ['locais-impressora'], queryFn: locaisImpressoraApi.list })
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Nº de Série" error={errors.num_serie?.message} required>
-          <input {...register('num_serie')} className={`input ${errors.num_serie ? 'input-error' : ''}`}
-            placeholder="SN-XXXXXXXX" disabled={editMode} />
-        </FormField>
-        <FormField label="Nome / Modelo" error={errors.nome?.message} required>
-          <input {...register('nome')} className={`input ${errors.nome ? 'input-error' : ''}`}
-            placeholder="HP LaserJet Pro M404n" />
-        </FormField>
-      </div>
+      <FormField label="Nº de Série" error={errors.num_serie?.message} required>
+        <input {...register('num_serie')} className={`input ${errors.num_serie ? 'input-error' : ''}`}
+          placeholder="SN-XXXXXXXX" disabled={editMode} />
+      </FormField>
+      <FormField label="Modelo" error={errors.modelo_id?.message}>
+        <select {...register('modelo_id')} className="input">
+          <option value="">Selecione o modelo (opcional)...</option>
+          {modelos && Object.entries(
+            modelos.reduce((acc, m) => {
+              if (!acc[m.fabricante]) acc[m.fabricante] = []
+              acc[m.fabricante].push(m)
+              return acc
+            }, {} as Record<string, typeof modelos>
+          )).map(([fab, lista]) => (
+            <optgroup key={fab} label={fab}>
+              {lista.map(m => (
+                <option key={m.id} value={m.id}>{m.modelo}{m.descricao ? ` — ${m.descricao}` : ''}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </FormField>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Tipo" error={errors.tipo_id?.message} required>
           <select {...register('tipo_id')} className={`input ${errors.tipo_id ? 'input-error' : ''}`}>
@@ -140,7 +153,11 @@ export default function ImpressorasPage() {
   }
 
   const filtered = (impressoras ?? []).filter(
-    (i) => i.nome.toLowerCase().includes(search.toLowerCase()) || i.num_serie.toLowerCase().includes(search.toLowerCase())
+    (i) => {
+      const nomeModelo = i.modelo ? `${i.modelo.fabricante} ${i.modelo.modelo}` : ''
+      return nomeModelo.toLowerCase().includes(search.toLowerCase()) ||
+             i.num_serie.toLowerCase().includes(search.toLowerCase())
+    }
   )
 
   if (isLoading) return <PageSpinner />
@@ -165,7 +182,7 @@ export default function ImpressorasPage() {
       <div className="card mb-4 flex flex-wrap gap-3 items-center">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-9 w-60" placeholder="Buscar por nome ou série…" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-9 w-60" placeholder="Buscar por modelo ou série…" />
         </div>
         <div className="flex gap-2">
           {[undefined, true, false].map((v) => (
@@ -181,7 +198,7 @@ export default function ImpressorasPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>Nº Série</th><th>Nome / Modelo</th><th>Tipo</th>
+              <th>Nº Série</th><th>Modelo</th><th>Tipo</th>
               <th>Setor</th><th>IP</th><th>Status</th><th className="text-right">Ações</th>
             </tr>
           </thead>
@@ -191,7 +208,7 @@ export default function ImpressorasPage() {
               : filtered.map((imp) => (
                 <tr key={imp.num_serie}>
                   <td className="font-mono text-xs">{imp.num_serie}</td>
-                  <td className="font-medium">{imp.nome}</td>
+                  <td className="text-xs">{imp.modelo ? <span className="badge-gray">{imp.modelo.fabricante} {imp.modelo.modelo}</span> : <span className="text-gray-300">—</span>}</td>
                   <td><span className="badge-blue">{imp.tipo.tipo}</span></td>
                   <td className="text-gray-600">{imp.local.setor}</td>
                   <td className="font-mono text-xs text-gray-500">{imp.ip ?? '—'}</td>
@@ -222,14 +239,14 @@ export default function ImpressorasPage() {
       <Modal isOpen={!!editItem} onClose={() => setEditItem(null)} title="Editar Impressora" size="lg">
         {editItem && (
           <ImpressoraForm
-            defaultValues={{ ...editItem, ip: editItem.ip ?? '' }}
+            defaultValues={{ num_serie: editItem.num_serie, modelo_id: editItem.modelo_id, tipo_id: editItem.tipo_id, local_id: editItem.local_id, ip: editItem.ip ?? '', ativa: editItem.ativa }}
             onSubmit={(d) => updateM.mutate({ ns: editItem.num_serie, data: d })}
             isLoading={updateM.isPending} editMode />
         )}
       </Modal>
       <ConfirmDialog isOpen={!!deleteItem} onClose={() => setDeleteItem(null)}
         onConfirm={() => deleteItem && deleteM.mutate(deleteItem.num_serie)}
-        message={`Excluir a impressora "${deleteItem?.nome}" e todas as suas leituras?`}
+        message={`Excluir a impressora "${deleteItem?.modelo ? `${deleteItem.modelo.fabricante} ${deleteItem.modelo.modelo}` : deleteItem?.num_serie}" e todas as suas leituras?`}
         isLoading={deleteM.isPending} />
     </div>
   )
